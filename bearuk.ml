@@ -18,6 +18,7 @@ let filter_flags args =
     | i :: tl when String.starts_with ~prefix:"-I" i ->
         let i = String.sub i 2 (String.length i - 2) in
         aux (i :: inc) tl
+    | o :: tl when String.ends_with ~suffix:".o" o -> aux inc tl
     | h :: tl when List.mem h to_exclude -> aux inc tl
     | h :: tl ->
         let l, inc = aux inc tl in
