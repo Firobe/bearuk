@@ -137,7 +137,11 @@ let write_makefile name units common_c common_cxx cincludes cxxincludes =
 
 let go name database =
   let units = Yojson.Safe.from_file database |> U.to_list in
-  let units = List.map parse units in
+  let units =
+    List.map parse units
+    |> List.sort_uniq (fun a b -> Fpath.compare a.relpath b.relpath)
+    (* TODO union of flags and includes when merging same file *)
+  in
   let units, common_c, common_cxx = common_flags units in
   let cincludes, cxxincludes = all_includes units in
   write_makefile name units common_c common_cxx cincludes cxxincludes
