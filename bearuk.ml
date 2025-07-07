@@ -113,12 +113,12 @@ let write_makefile name units common_c common_cxx cincludes cxxincludes =
   if not @@ FlagS.is_empty cincludes then (
     p "# All C include paths\n";
     p "%s_CINCLUDES-y += " name_up;
-    FlagS.iter (p " %s") cincludes;
+    FlagS.iter (p " -I$(%s_BASE)/%s" name_up) cincludes;
     p "\n");
   if not @@ FlagS.is_empty cxxincludes then (
     p "# All C++ include paths\n";
     p "%s_CXXINCLUDES-y += " name_up;
-    FlagS.iter (p " %s") cxxincludes;
+    FlagS.iter (p " -I$(%s_BASE)/%s" name_up) cxxincludes;
     p "\n");
   p "\n";
   p "# Source files and their specific flags\n";
