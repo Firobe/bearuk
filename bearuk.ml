@@ -55,7 +55,7 @@ let parse unit =
     List.map
       (fun i ->
         let fragment = fpath i in
-        Fpath.(cwd // fragment) |> relativize_path)
+        Fpath.(cwd // fragment) |> relativize_path |> Fpath.to_dir_path)
       includes
     |> PathS.of_list
   in
@@ -135,13 +135,27 @@ let write_makefile name units common_c common_cxx cincludes cxxincludes =
   p "# Source files and their specific flags\n";
   List.iter (write_unit name_up) units
 
+let dedup_units units =
+  let sorted =
+    List.sort_uniq (fun a b -> Fpath.compare a.relpath b.relpath) units
+  in
+  let merge a b =
+    {
+      a with
+      flags = FlagS.union a.flags b.flags;
+      includes = PathS.union a.includes b.includes;
+    }
+  in
+  let rec aux = function
+    | a :: b :: tl when Fpath.equal a.relpath b.relpath -> merge a b :: aux tl
+    | h :: tl -> h :: aux tl
+    | [] -> []
+  in
+  aux sorted
+
 let go name database =
   let units = Yojson.Safe.from_file database |> U.to_list in
-  let units =
-    List.map parse units
-    |> List.sort_uniq (fun a b -> Fpath.compare a.relpath b.relpath)
-    (* TODO union of flags and includes when merging same file *)
-  in
+  let units = List.map parse units |> dedup_units in
   let units, common_c, common_cxx = common_flags units in
   let cincludes, cxxincludes = all_includes units in
   write_makefile name units common_c common_cxx cincludes cxxincludes
