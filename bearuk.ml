@@ -1,5 +1,6 @@
 module U = Yojson.Safe.Util
 module FlagS = Set.Make (String)
+module PathS = Set.Make (Fpath)
 
 let p = Fmt.pr
 let fpath x = Fpath.of_string x |> Result.get_ok
@@ -25,13 +26,13 @@ let filter_flags args =
         (h :: l, inc)
   in
   let leftover_flags, includes = aux [] args in
-  (FlagS.of_list includes, FlagS.of_list leftover_flags)
+  (includes, FlagS.of_list leftover_flags)
 
 type tunit = {
   base_name : string;
   flags : FlagS.t;
   relpath : Fpath.t;
-  includes : FlagS.t;
+  includes : PathS.t; (* include paths are relative to root directory *)
   lang : [ `C | `CXX ];
 }
 
@@ -48,6 +49,15 @@ let parse unit =
   in
   let includes, flags =
     U.(member "arguments" unit |> convert_each to_string) |> filter_flags
+  in
+  let cwd = U.(member "directory" unit |> to_string) |> fpath in
+  let includes =
+    List.map
+      (fun i ->
+        let fragment = fpath i in
+        Fpath.(cwd // fragment) |> relativize_path)
+      includes
+    |> PathS.of_list
   in
   { base_name = filename_up; flags; relpath = input; lang; includes }
 
@@ -85,8 +95,8 @@ let all_includes units =
   in
   let reduce =
     List.fold_left
-      (fun acc { includes; _ } -> FlagS.union acc includes)
-      FlagS.empty
+      (fun acc { includes; _ } -> PathS.union acc includes)
+      PathS.empty
   in
   (reduce cincludes, reduce cxxincludes)
 
@@ -111,15 +121,15 @@ let write_makefile name units common_c common_cxx cincludes cxxincludes =
     p "%s_CXXFLAGS-y += " name_up;
     FlagS.iter (p " %s") common_cxx;
     p "\n");
-  if not @@ FlagS.is_empty cincludes then (
+  if not @@ PathS.is_empty cincludes then (
     p "# All C include paths\n";
     p "%s_CINCLUDES-y += " name_up;
-    FlagS.iter (p " -I$(%s_BASE)/%s" name_up) cincludes;
+    PathS.iter (p " -I$(%s_BASE)/%a" name_up Fpath.pp) cincludes;
     p "\n");
-  if not @@ FlagS.is_empty cxxincludes then (
+  if not @@ PathS.is_empty cxxincludes then (
     p "# All C++ include paths\n";
     p "%s_CXXINCLUDES-y += " name_up;
-    FlagS.iter (p " -I$(%s_BASE)/%s" name_up) cxxincludes;
+    PathS.iter (p " -I$(%s_BASE)/%a" name_up Fpath.pp) cxxincludes;
     p "\n");
   p "\n";
   p "# Source files and their specific flags\n";
