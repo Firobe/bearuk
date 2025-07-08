@@ -3,6 +3,7 @@ module FlagS = Set.Make (String)
 module PathS = Set.Make (Fpath)
 
 let p = Fmt.pr
+let pf = Fmt.pf
 let fpath x = Fpath.of_string x |> Result.get_ok
 let root = Sys.getcwd () |> fpath
 let relativize_path abs = Fpath.relativize ~root abs |> Option.get
@@ -100,36 +101,43 @@ let all_includes units =
   in
   (reduce cincludes, reduce cxxincludes)
 
-let write_section comment =
-  p
+let write_section fmt comment =
+  pf fmt
     "\n\
      ################################################################################\n";
-  p "# %s\n" comment;
-  p
+  pf fmt "# %s\n" comment;
+  pf fmt
     "################################################################################\n"
 
 let pp_flags fmt s = FlagS.iter (Fmt.pf fmt " %s") s
 
-let write_unit name { base_name; relpath; flags; _ } =
-  p "%s_SRCS-y += $(%s_BASE)/%a\n" name name Fpath.pp relpath;
+let write_unit fmt name { base_name; relpath; flags; _ } =
+  pf fmt "%s_SRCS-y += $(%s_BASE)/%a\n" name name Fpath.pp relpath;
   if not @@ FlagS.is_empty flags then
-    p "%s_%s_FLAGS-y += %a\n" name base_name pp_flags flags
+    pf fmt "%s_%s_FLAGS-y += %a\n" name base_name pp_flags flags
 
-let write_makefile name units common_c common_cxx cincludes cxxincludes =
+let write_makefile ~really_write name units common_c common_cxx cincludes
+    cxxincludes =
   let name_up = String.uppercase_ascii name in
+  let fmt =
+    if really_write then (
+      p "Writing to Makefile.uk!\n";
+      Out_channel.open_text "./Makefile.uk" |> Format.formatter_of_out_channel)
+    else Fmt.stdout
+  in
   let pp_paths fmt s =
     PathS.iter (Fmt.pf fmt " -I$(%s_BASE)/%a" name_up Fpath.pp) s
   in
-  write_section "Registration";
-  p "$(eval $(call addlib,%s))\n" name;
-  write_section "Flags";
-  p "%s_CFLAGS-y += %a\n" name_up pp_flags common_c;
-  p "%s_CXXFLAGS-y += %a\n" name_up pp_flags common_cxx;
-  write_section "Includes";
-  p "%s_CINCLUDES-y += %a\n" name_up pp_paths cincludes;
-  p "%s_CXXINCLUDES-y += %a\n" name_up pp_paths cxxincludes;
-  write_section "Sources";
-  List.iter (write_unit name_up) units
+  write_section fmt "Registration";
+  pf fmt "$(eval $(call addlib,%s))\n" name;
+  write_section fmt "Flags";
+  pf fmt "%s_CFLAGS-y += %a\n" name_up pp_flags common_c;
+  pf fmt "%s_CXXFLAGS-y += %a\n" name_up pp_flags common_cxx;
+  write_section fmt "Includes";
+  pf fmt "%s_CINCLUDES-y += %a\n" name_up pp_paths cincludes;
+  pf fmt "%s_CXXINCLUDES-y += %a\n" name_up pp_paths cxxincludes;
+  write_section fmt "Sources";
+  List.iter (write_unit fmt name_up) units
 
 let dedup_units units =
   let sorted =
@@ -151,7 +159,7 @@ let dedup_units units =
 
 type mode = Library | Application
 
-let go name database mode =
+let go name database mode really_write =
   let name =
     match mode with Application -> "app" ^ name | Library -> "lib" ^ name
   in
@@ -159,7 +167,8 @@ let go name database mode =
   let units = List.map parse units |> dedup_units in
   let units, common_c, common_cxx = common_flags units in
   let cincludes, cxxincludes = all_includes units in
-  write_makefile name units common_c common_cxx cincludes cxxincludes
+  write_makefile ~really_write name units common_c common_cxx cincludes
+    cxxincludes
 
 open Cmdliner
 
@@ -185,6 +194,11 @@ let mode =
   in
   Arg.(value & vflag Library flags)
 
+let really_write =
+  Arg.(
+    value & flag
+    & info [ "w" ] ~doc:"Write generated files on disk instead of printing")
+
 let name' =
   let doc =
     "Name of the application or library. Do not prefix with 'app' or 'lib'"
@@ -192,7 +206,7 @@ let name' =
   Arg.(required & pos 0 (some string) None & info [] ~docv:"NAME" ~doc)
 
 let cmd =
-  let term = Term.(const go $ name' $ coco $ mode) in
+  let term = Term.(const go $ name' $ coco $ mode $ really_write) in
   let doc = "Generate Unikraft build files from a compile_commands.json file" in
   let info = Cmd.info ~doc "bearuk" in
   Cmd.v info term
