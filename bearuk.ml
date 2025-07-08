@@ -153,16 +153,52 @@ let dedup_units units =
   in
   aux sorted
 
-let go name database =
+type mode = Library | Application
+
+let go name database mode =
+  let name =
+    match mode with Application -> "app" ^ name | Library -> "lib" ^ name
+  in
   let units = Yojson.Safe.from_file database |> U.to_list in
   let units = List.map parse units |> dedup_units in
   let units, common_c, common_cxx = common_flags units in
   let cincludes, cxxincludes = all_includes units in
   write_makefile name units common_c common_cxx cincludes cxxincludes
 
-let () =
-  try
-    let name = Sys.argv.(1) in
-    let database = Sys.argv.(2) in
-    go name database
-  with _ -> p "Usage: bearuk NAME PATH_TO_COMPILE_COMMANDS\n"
+open Cmdliner
+
+let coco =
+  let doc =
+    "Path to the `compile_commands.json` file to use. By default, look in the \
+     current directory"
+  in
+  Arg.(
+    value
+    & opt non_dir_file "./compile_commands.json"
+    & info [ "f"; "file" ] ~docv:"PATH" ~doc)
+
+let mode =
+  let flags =
+    [
+      ( Library,
+        Arg.info [ "lib" ]
+          ~doc:"Generate build files for a library (the default)." );
+      ( Application,
+        Arg.info [ "app" ] ~doc:"Generate build files for a library." );
+    ]
+  in
+  Arg.(value & vflag Library flags)
+
+let name' =
+  let doc =
+    "Name of the application or library. Do not prefix with 'app' or 'lib'"
+  in
+  Arg.(required & pos 0 (some string) None & info [] ~docv:"NAME" ~doc)
+
+let cmd =
+  let term = Term.(const go $ name' $ coco $ mode) in
+  let doc = "Generate Unikraft build files from a compile_commands.json file" in
+  let info = Cmd.info ~doc "bearuk" in
+  Cmd.v info term
+
+let () = exit (Cmd.eval cmd)
