@@ -1,0 +1,27 @@
+spec: v0.6
+
+name: iperf3
+
+unikraft:
+  version: staging
+  kconfig:
+    CONFIG_LIBUKBUS: 'y'
+    CONFIG_LIBPOSIX_FDIO: 'y'
+    CONFIG_LIBUKNETDEV_EINFO_LIBPARAM: 'y'
+    CONFIG_LIBUKINTCTLR_GICV3: 'y'
+
+targets:
+- platform: qemu
+  arch: x86_64
+
+libraries:
+  musl: stable
+  lwip:
+    version: stable
+    kconfig:
+      CONFIG_LWIP_UKNETDEV: 'y'
+      CONFIG_LWIP_TCP: 'y'
+      CONFIG_LWIP_THREADS: 'y'
+      CONFIG_LWIP_SOCKET: 'y'
+      CONFIG_LWIP_AUTOIFACE: 'y'
+      CONFIG_LWIP_IPV4: 'y'

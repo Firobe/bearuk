@@ -1,0 +1,53 @@
+# Registration
+$(eval $(call addlib,iperf))
+
+# Common C flags
+IPERF_CFLAGS-y +=  -DHAVE_CONFIG_H -O2 -Wall -g -pthread
+# All C include paths
+IPERF_CINCLUDES-y +=  -I$(IPERF_BASE)/examples/ -I$(IPERF_BASE)/src/
+
+# Source files and their specific flags
+#IPERF_SRCS-y += $(IPERF_BASE)/examples/mic.c
+#IPERF_SRCS-y += $(IPERF_BASE)/examples/mis.c
+IPERF_SRCS-y += $(IPERF_BASE)/src/cjson.c
+IPERF_CJSON_FLAGS-y += -DPIC -fPIC
+IPERF_SRCS-y += $(IPERF_BASE)/src/dscp.c
+IPERF_DSCP_FLAGS-y += -DPIC -fPIC
+IPERF_SRCS-y += $(IPERF_BASE)/src/iperf_api.c
+IPERF_IPERF_API_FLAGS-y += -DPIC -fPIC
+IPERF_SRCS-y += $(IPERF_BASE)/src/iperf_auth.c
+IPERF_IPERF_AUTH_FLAGS-y += -DPIC -fPIC
+IPERF_SRCS-y += $(IPERF_BASE)/src/iperf_client_api.c
+IPERF_IPERF_CLIENT_API_FLAGS-y += -DPIC -fPIC
+IPERF_SRCS-y += $(IPERF_BASE)/src/iperf_error.c
+IPERF_IPERF_ERROR_FLAGS-y += -DPIC -fPIC
+IPERF_SRCS-y += $(IPERF_BASE)/src/iperf_locale.c
+IPERF_IPERF_LOCALE_FLAGS-y += -DPIC -fPIC
+IPERF_SRCS-y += $(IPERF_BASE)/src/iperf_pthread.c
+IPERF_IPERF_PTHREAD_FLAGS-y += -DPIC -fPIC
+IPERF_SRCS-y += $(IPERF_BASE)/src/iperf_sctp.c
+IPERF_IPERF_SCTP_FLAGS-y += -DPIC -fPIC
+IPERF_SRCS-y += $(IPERF_BASE)/src/iperf_server_api.c
+IPERF_IPERF_SERVER_API_FLAGS-y += -DPIC -fPIC
+IPERF_SRCS-y += $(IPERF_BASE)/src/iperf_tcp.c
+IPERF_IPERF_TCP_FLAGS-y += -DPIC -fPIC
+IPERF_SRCS-y += $(IPERF_BASE)/src/iperf_time.c
+IPERF_IPERF_TIME_FLAGS-y += -DPIC -fPIC
+IPERF_SRCS-y += $(IPERF_BASE)/src/iperf_udp.c
+IPERF_IPERF_UDP_FLAGS-y += -DPIC -fPIC
+IPERF_SRCS-y += $(IPERF_BASE)/src/iperf_util.c
+IPERF_IPERF_UTIL_FLAGS-y += -DPIC -fPIC
+IPERF_SRCS-y += $(IPERF_BASE)/src/main.c
+IPERF_SRCS-y += $(IPERF_BASE)/src/net.c
+IPERF_NET_FLAGS-y += -DPIC -fPIC
+#IPERF_SRCS-y += $(IPERF_BASE)/src/t_api.c
+#IPERF_SRCS-y += $(IPERF_BASE)/src/t_auth.c
+#IPERF_SRCS-y += $(IPERF_BASE)/src/t_timer.c
+#IPERF_SRCS-y += $(IPERF_BASE)/src/t_units.c
+#IPERF_SRCS-y += $(IPERF_BASE)/src/t_uuid.c
+#IPERF_SRCS-y += $(IPERF_BASE)/src/tcp_info.c
+IPERF_TCP_INFO_FLAGS-y += -DPIC -fPIC
+IPERF_SRCS-y += $(IPERF_BASE)/src/timer.c
+IPERF_TIMER_FLAGS-y += -DPIC -fPIC
+IPERF_SRCS-y += $(IPERF_BASE)/src/units.c
+IPERF_UNITS_FLAGS-y += -DPIC -fPIC
