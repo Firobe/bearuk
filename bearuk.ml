@@ -100,39 +100,35 @@ let all_includes units =
   in
   (reduce cincludes, reduce cxxincludes)
 
+let write_section comment =
+  p
+    "\n\
+     ################################################################################\n";
+  p "# %s\n" comment;
+  p
+    "################################################################################\n"
+
+let pp_flags fmt s = FlagS.iter (Fmt.pf fmt " %s") s
+
 let write_unit name { base_name; relpath; flags; _ } =
   p "%s_SRCS-y += $(%s_BASE)/%a\n" name name Fpath.pp relpath;
-  if not @@ FlagS.is_empty flags then (
-    p "%s_%s_FLAGS-y +=" name base_name;
-    FlagS.iter (p " %s") flags;
-    p "\n")
+  if not @@ FlagS.is_empty flags then
+    p "%s_%s_FLAGS-y += %a\n" name base_name pp_flags flags
 
 let write_makefile name units common_c common_cxx cincludes cxxincludes =
   let name_up = String.uppercase_ascii name in
-  p "# Registration\n";
-  p "$(eval $(call addlib,%s))\n\n" name;
-  if not @@ FlagS.is_empty common_c then (
-    p "# Common C flags\n";
-    p "%s_CFLAGS-y += " name_up;
-    FlagS.iter (p " %s") common_c;
-    p "\n");
-  if not @@ FlagS.is_empty common_cxx then (
-    p "# Common C++ flags\n";
-    p "%s_CXXFLAGS-y += " name_up;
-    FlagS.iter (p " %s") common_cxx;
-    p "\n");
-  if not @@ PathS.is_empty cincludes then (
-    p "# All C include paths\n";
-    p "%s_CINCLUDES-y += " name_up;
-    PathS.iter (p " -I$(%s_BASE)/%a" name_up Fpath.pp) cincludes;
-    p "\n");
-  if not @@ PathS.is_empty cxxincludes then (
-    p "# All C++ include paths\n";
-    p "%s_CXXINCLUDES-y += " name_up;
-    PathS.iter (p " -I$(%s_BASE)/%a" name_up Fpath.pp) cxxincludes;
-    p "\n");
-  p "\n";
-  p "# Source files and their specific flags\n";
+  let pp_paths fmt s =
+    PathS.iter (Fmt.pf fmt " -I$(%s_BASE)/%a" name_up Fpath.pp) s
+  in
+  write_section "Registration";
+  p "$(eval $(call addlib,%s))\n" name;
+  write_section "Flags";
+  p "%s_CFLAGS-y += %a\n" name_up pp_flags common_c;
+  p "%s_CXXFLAGS-y += %a\n" name_up pp_flags common_cxx;
+  write_section "Includes";
+  p "%s_CINCLUDES-y += %a\n" name_up pp_paths cincludes;
+  p "%s_CXXINCLUDES-y += %a\n" name_up pp_paths cxxincludes;
+  write_section "Sources";
   List.iter (write_unit name_up) units
 
 let dedup_units units =
