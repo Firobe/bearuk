@@ -37,6 +37,8 @@ type tunit = {
   lang : [ `C | `CXX ];
 }
 
+type mode = Library | Application
+
 let parse unit =
   let input = U.(member "file" unit |> to_string) |> fpath |> relativize_path in
   let filename_up =
@@ -101,44 +103,6 @@ let all_includes units =
   in
   (reduce cincludes, reduce cxxincludes)
 
-let write_section fmt comment =
-  pf fmt
-    "\n\
-     ################################################################################\n";
-  pf fmt "# %s\n" comment;
-  pf fmt
-    "################################################################################\n"
-
-let pp_flags fmt s = FlagS.iter (Fmt.pf fmt " %s") s
-
-let write_unit fmt name { base_name; relpath; flags; _ } =
-  pf fmt "%s_SRCS-y += $(%s_BASE)/%a\n" name name Fpath.pp relpath;
-  if not @@ FlagS.is_empty flags then
-    pf fmt "%s_%s_FLAGS-y += %a\n" name base_name pp_flags flags
-
-let write_makefile ~really_write name units common_c common_cxx cincludes
-    cxxincludes =
-  let name_up = String.uppercase_ascii name in
-  let fmt =
-    if really_write then (
-      p "Writing to Makefile.uk!\n";
-      Out_channel.open_text "./Makefile.uk" |> Format.formatter_of_out_channel)
-    else Fmt.stdout
-  in
-  let pp_paths fmt s =
-    PathS.iter (Fmt.pf fmt " -I$(%s_BASE)/%a" name_up Fpath.pp) s
-  in
-  write_section fmt "Registration";
-  pf fmt "$(eval $(call addlib,%s))\n" name;
-  write_section fmt "Flags";
-  pf fmt "%s_CFLAGS-y += %a\n" name_up pp_flags common_c;
-  pf fmt "%s_CXXFLAGS-y += %a\n" name_up pp_flags common_cxx;
-  write_section fmt "Includes";
-  pf fmt "%s_CINCLUDES-y += %a\n" name_up pp_paths cincludes;
-  pf fmt "%s_CXXINCLUDES-y += %a\n" name_up pp_paths cxxincludes;
-  write_section fmt "Sources";
-  List.iter (write_unit fmt name_up) units
-
 let dedup_units units =
   let sorted =
     List.sort_uniq (fun a b -> Fpath.compare a.relpath b.relpath) units
@@ -157,7 +121,54 @@ let dedup_units units =
   in
   aux sorted
 
-type mode = Library | Application
+let write_section fmt comment =
+  pf fmt
+    "\n\
+     ################################################################################\n";
+  pf fmt "# %s\n" comment;
+  pf fmt
+    "################################################################################\n"
+
+let pp_flags fmt s = FlagS.iter (Fmt.pf fmt " %s") s
+
+let file_or_stdout ~really_write name =
+  if really_write then (
+    p "Writing to %s!\n" name;
+    Out_channel.open_text name |> Format.formatter_of_out_channel)
+  else (
+    p "\n------------- %s -------------\n" name;
+    Fmt.stdout)
+
+let write_unit fmt name { base_name; relpath; flags; _ } =
+  pf fmt "%s_SRCS-y += $(%s_BASE)/%a\n" name name Fpath.pp relpath;
+  if not @@ FlagS.is_empty flags then
+    pf fmt "%s_%s_FLAGS-y += %a\n" name base_name pp_flags flags
+
+let write_makefile ~really_write name units common_c common_cxx cincludes
+    cxxincludes =
+  let name_up = String.uppercase_ascii name in
+  let fmt = file_or_stdout ~really_write "Makefile.uk" in
+  let pp_paths fmt s =
+    PathS.iter (Fmt.pf fmt " -I$(%s_BASE)/%a" name_up Fpath.pp) s
+  in
+  write_section fmt "Registration";
+  pf fmt "$(eval $(call addlib,%s))\n" name;
+  write_section fmt "Flags";
+  pf fmt "%s_CFLAGS-y += %a\n" name_up pp_flags common_c;
+  pf fmt "%s_CXXFLAGS-y += %a\n" name_up pp_flags common_cxx;
+  write_section fmt "Includes";
+  pf fmt "%s_CINCLUDES-y += %a\n" name_up pp_paths cincludes;
+  pf fmt "%s_CXXINCLUDES-y += %a\n" name_up pp_paths cxxincludes;
+  write_section fmt "Sources";
+  List.iter (write_unit fmt name_up) units
+
+let write_config_uk ~really_write name =
+  let name_up = String.uppercase_ascii name in
+  let fmt = file_or_stdout ~really_write "Config.uk" in
+  pf fmt "menuconfig %s\n" name_up;
+  pf fmt "\tbool \"%s: write description here\"\n" name;
+  pf fmt "\tdefault n\n";
+  pf fmt "\tdepends on HAVE_LIBC\n"
 
 let go name database mode really_write =
   let name =
@@ -167,6 +178,7 @@ let go name database mode really_write =
   let units = List.map parse units |> dedup_units in
   let units, common_c, common_cxx = common_flags units in
   let cincludes, cxxincludes = all_includes units in
+  if mode = Library then write_config_uk ~really_write name;
   write_makefile ~really_write name units common_c common_cxx cincludes
     cxxincludes
 
