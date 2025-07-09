@@ -146,20 +146,26 @@ let write_unit fmt name { base_name; relpath; flags; _ } =
     pf fmt "%s_%s_FLAGS-y += %a\n" name base_name pp_flags flags
 
 let write_makefile ~really_write name units common_c common_cxx cincludes
-    cxxincludes =
+    cxxincludes mode =
   let name_up = String.uppercase_ascii name in
   let fmt = file_or_stdout ~really_write "Makefile.uk" in
   let pp_paths fmt s =
     PathS.iter (Fmt.pf fmt " -I$(%s_BASE)/%a" name_up Fpath.pp) s
   in
   write_section fmt "Registration";
-  pf fmt "$(eval $(call addlib,%s))\n" name;
+  (match mode with
+  | Application -> pf fmt "$(eval $(call addlib,%s))\n" name
+  | Library -> pf fmt "$(eval $(call addlib_s,%s,$(CONFIG_%s)))\n" name name_up);
   write_section fmt "Flags";
   pf fmt "%s_CFLAGS-y += %a\n" name_up pp_flags common_c;
   pf fmt "%s_CXXFLAGS-y += %a\n" name_up pp_flags common_cxx;
-  write_section fmt "Includes";
+  write_section fmt "Includes necessary to build";
   pf fmt "%s_CINCLUDES-y += %a\n" name_up pp_paths cincludes;
   pf fmt "%s_CXXINCLUDES-y += %a\n" name_up pp_paths cxxincludes;
+  if mode = Library then (
+    write_section fmt "Headers the library should export";
+    pf fmt "CINCLUDES-$(CONFIG_%s) += # complete me\n" name_up;
+    pf fmt "CXXINCLUDES-$(CONFIG_%s) += # complete me\n" name_up);
   write_section fmt "Sources";
   List.iter (write_unit fmt name_up) units
 
@@ -181,7 +187,7 @@ let go name database mode really_write root =
   let cincludes, cxxincludes = all_includes units in
   if mode = Library then write_config_uk ~really_write name;
   write_makefile ~really_write name units common_c common_cxx cincludes
-    cxxincludes
+    cxxincludes mode
 
 open Cmdliner
 
