@@ -5,8 +5,7 @@ module PathS = Set.Make (Fpath)
 let p = Fmt.pr
 let pf = Fmt.pf
 let fpath x = Fpath.of_string x |> Result.get_ok
-let root = Sys.getcwd () |> fpath
-let relativize_path abs = Fpath.relativize ~root abs |> Option.get
+let relativize_path root abs = Fpath.relativize ~root abs |> Option.get
 
 let filter_flags args =
   let args = List.tl args in
@@ -39,8 +38,10 @@ type tunit = {
 
 type mode = Library | Application
 
-let parse unit =
-  let input = U.(member "file" unit |> to_string) |> fpath |> relativize_path in
+let parse root unit =
+  let input =
+    U.(member "file" unit |> to_string) |> fpath |> relativize_path root
+  in
   let filename_up =
     Fpath.rem_ext input |> Fpath.filename |> String.uppercase_ascii
   in
@@ -58,7 +59,7 @@ let parse unit =
     List.map
       (fun i ->
         let fragment = fpath i in
-        Fpath.(cwd // fragment) |> relativize_path |> Fpath.to_dir_path)
+        Fpath.(cwd // fragment) |> relativize_path root |> Fpath.to_dir_path)
       includes
     |> PathS.of_list
   in
@@ -170,12 +171,12 @@ let write_config_uk ~really_write name =
   pf fmt "\tdefault n\n";
   pf fmt "\tdepends on HAVE_LIBC\n"
 
-let go name database mode really_write =
+let go name database mode really_write root =
   let name =
     match mode with Application -> "app" ^ name | Library -> "lib" ^ name
   in
   let units = Yojson.Safe.from_file database |> U.to_list in
-  let units = List.map parse units |> dedup_units in
+  let units = List.map (parse root) units |> dedup_units in
   let units, common_c, common_cxx = common_flags units in
   let cincludes, cxxincludes = all_includes units in
   if mode = Library then write_config_uk ~really_write name;
@@ -217,8 +218,18 @@ let name' =
   in
   Arg.(required & pos 0 (some string) None & info [] ~docv:"NAME" ~doc)
 
+let fpath_conv = Arg.conv ~docv:"PATH" (Fpath.of_string, Fpath.pp)
+
+let root =
+  let cwd = Sys.getcwd () |> fpath in
+  let doc =
+    "Absolute path to the base of the project where compile_commands.json was \
+     created (defaults to current directory)"
+  in
+  Arg.(value & opt fpath_conv cwd & info [ "r"; "root" ] ~docv:"ROOT" ~doc)
+
 let cmd =
-  let term = Term.(const go $ name' $ coco $ mode $ really_write) in
+  let term = Term.(const go $ name' $ coco $ mode $ really_write $ root) in
   let doc = "Generate Unikraft build files from a compile_commands.json file" in
   let info = Cmd.info ~doc "bearuk" in
   Cmd.v info term
